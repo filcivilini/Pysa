@@ -1,0 +1,11 @@
+LICENSE
+README.md
+pyproject.toml
+src/pysa/__init__.py
+src/pysa/core.py
+src/pysa.egg-info/PKG-INFO
+src/pysa.egg-info/SOURCES.txt
+src/pysa.egg-info/dependency_links.txt
+src/pysa.egg-info/requires.txt
+src/pysa.egg-info/top_level.txt
+tests/test_core.py
