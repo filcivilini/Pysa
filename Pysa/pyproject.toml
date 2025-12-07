@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pysa"
+name = "pysa-pv"
 version = "0.1.0"
 description = "PISA-style weighted least squares with BRR-Fay and plausible values."
 readme = "README.md"
