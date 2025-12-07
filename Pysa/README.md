@@ -29,6 +29,6 @@ It is designed for analyses aligned with standard OECD/PISA practices:
 
 ## Installation
 
-### From PyPI (once published)
+### From PyPI
 ```bash
 pip install pysa
