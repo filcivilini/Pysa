@@ -31,4 +31,4 @@ It is designed for analyses aligned with standard OECD/PISA practices:
 
 ### From PyPI
 ```bash
-pip install pysa
+pip install pysa-pv
