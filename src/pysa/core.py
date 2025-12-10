@@ -11,6 +11,11 @@ Key assumptions for *actual PISA data*:
     - PISA 2022: W_FSTURWT1 ... W_FSTURWT80
     - PISA 2000–2018: W_FSTR1 ... W_FSTR80
 - Fay factor k = 0.5  (do NOT change this for official PISA data)
+
+What this version adds:
+- Standardized coefficients, SEs, and t-values.
+  These are computed using weighted SDs (full weight) on the same analytic
+  sample used for each PV regression.
 """
 
 from __future__ import annotations
@@ -26,11 +31,58 @@ import statsmodels.api as sm
 @dataclass
 class PysaResult:
     """Container for one regression model result."""
-    coef: pd.Series          # combined coefficients across PVs
-    se: pd.Series            # combined standard errors across PVs
-    r2: float                # mean R^2 across PVs (point estimate only)
-    n_obs: int               # number of observations used (min across PVs)
-    dep_root: str            # e.g. "MATH", "READ"
+
+    # Unstandardized (combined across PVs)
+    coef: pd.Series
+    se: pd.Series
+
+    # Standardized (combined across PVs)
+    std_coef: pd.Series
+    std_se: pd.Series
+
+    # Model-level info
+    r2: float
+    n_obs: int
+    dep_root: str
+
+    def to_dataframe(self) -> pd.DataFrame:
+        """Return a tidy DataFrame with unstandardized and standardized results."""
+        df = pd.DataFrame({
+            "Variable": self.coef.index,
+            "coef": self.coef.values,
+            "se": self.se.reindex(self.coef.index).values,
+            "std_coef": self.std_coef.reindex(self.coef.index).values,
+            "std_se": self.std_se.reindex(self.coef.index).values,
+        })
+        df["t"] = df["coef"] / df["se"]
+        df["std_t"] = df["std_coef"] / df["std_se"]
+        return df
+
+
+
+def _wmean(x: pd.Series, w: pd.Series) -> float:
+    x = pd.to_numeric(x, errors="coerce").to_numpy(dtype=float)
+    w = pd.to_numeric(w, errors="coerce").to_numpy(dtype=float)
+    mask = np.isfinite(x) & np.isfinite(w)
+    x = x[mask]
+    w = w[mask]
+    if w.size == 0 or np.sum(w) == 0:
+        return float("nan")
+    return float(np.sum(w * x) / np.sum(w))
+
+
+def _wsd(x: pd.Series, w: pd.Series) -> float:
+    x = pd.to_numeric(x, errors="coerce").to_numpy(dtype=float)
+    w = pd.to_numeric(w, errors="coerce").to_numpy(dtype=float)
+    mask = np.isfinite(x) & np.isfinite(w)
+    x = x[mask]
+    w = w[mask]
+    if w.size == 0 or np.sum(w) == 0:
+        return float("nan")
+    m = np.sum(w * x) / np.sum(w)
+    var = np.sum(w * (x - m) ** 2) / np.sum(w)
+    return float(np.sqrt(var))
+
 
 
 def _build_design_matrix(
@@ -69,6 +121,7 @@ def _build_design_matrix(
     X = df_work[used_cols].copy()
     X = X.astype(float)
     return X
+
 
 
 def _wls_brr_fay_single_pv(
@@ -134,6 +187,7 @@ def pysa_wls(
     fay_rho: float = 0.5,
     country_var: str = "CNTRYID",
     country_values: Optional[Union[int, str, Iterable[Union[int, str]]]] = None,
+    compute_standardized: bool = True,
 ) -> PysaResult:
     """
     Run PISA-style WLS regression with BRR-Fay and plausible values.
@@ -164,11 +218,14 @@ def pysa_wls(
         Country identifier variable.
     country_values : int, str, or iterable, optional
         Value(s) of country_var to keep (e.g. 380 for Italy). If None, no filter.
+    compute_standardized : bool, default True
+        Whether to compute standardized coefficients/SEs.
 
     Returns
     -------
     PysaResult
-        Contains coefficients, standard errors, R² and n_obs.
+        Contains unstandardized and standardized coefficients, standard errors,
+        mean R² and n_obs.
 
     Notes
     -----
@@ -182,7 +239,7 @@ def pysa_wls(
     """
     df = data.copy()
 
-    # Optional: clearer error messages for regressors
+    # Check regressors exist
     missing_regressors = (
         [c for c in num_vars if c not in df.columns]
         + [c for c in cat_vars if c not in df.columns]
@@ -191,6 +248,7 @@ def pysa_wls(
     if missing_regressors:
         raise ValueError(f"Missing regressor columns: {missing_regressors}")
 
+    # Country filter
     if country_values is not None:
         if isinstance(country_values, (int, str)):
             df = df[df[country_var] == country_values]
@@ -210,18 +268,25 @@ def pysa_wls(
     if missing_rep:
         raise ValueError(f"Missing replicate weight columns: {missing_rep}")
 
+    # Build X once
     X = _build_design_matrix(df, num_vars=num_vars, cat_vars=cat_vars, fixed_effects=fixed_effects)
 
     base_w = df[weight_col]
     rep_w = df[rep_cols]
 
+    # Storage per PV
     betas_full = []
     vars_brr = []
     r2_list = []
     n_list = []
 
+    betas_std = []
+    vars_std = []
+
     for pv in pv_cols:
         y = df[pv]
+
+        # Unstandardized WLS + BRR-Fay
         beta_full, var_brr, r2_full, n_obs = _wls_brr_fay_single_pv(
             y=y,
             X=X,
@@ -229,11 +294,41 @@ def pysa_wls(
             replicate_weights=rep_w,
             fay_rho=fay_rho,
         )
+
         betas_full.append(beta_full)
         vars_brr.append(var_brr)
         r2_list.append(r2_full)
         n_list.append(n_obs)
 
+        # Standardized (optional)
+        if compute_standardized:
+            # Use the same analytic sample definition as the single-PV function
+            merged = pd.concat([y, X, base_w, rep_w], axis=1).dropna()
+            y_use = merged[pv]
+            X_use = merged[X.columns]
+            w_full = merged[weight_col]
+
+            sd_y = _wsd(y_use, w_full)
+
+            scale = {}
+            for name in beta_full.index:
+                if name == "const":
+                    scale[name] = np.nan
+                elif name in X_use.columns:
+                    sd_x = _wsd(X_use[name], w_full)
+                    scale[name] = (sd_x / sd_y) if (sd_y and np.isfinite(sd_y) and sd_y != 0) else np.nan
+                else:
+                    scale[name] = np.nan
+
+            scale_s = pd.Series(scale)
+
+            beta_std = beta_full * scale_s
+            var_std_brr = var_brr * (scale_s ** 2)
+
+            betas_std.append(beta_std)
+            vars_std.append(var_std_brr)
+
+    # Combine across PVs (Rubin-style)
     betas_df = pd.DataFrame(betas_full)
     vars_df = pd.DataFrame(vars_brr)
 
@@ -250,15 +345,39 @@ def pysa_wls(
     total_var = U_bar + (1.0 + 1.0 / M) * B
     se = total_var.pow(0.5)
 
-    r2_mean = float(np.mean(r2_list))
+    # Standardized combine
+    if compute_standardized and betas_std:
+        betas_std_df = pd.DataFrame(betas_std)
+        vars_std_df = pd.DataFrame(vars_std)
+
+        beta_bar_std = betas_std_df.mean(axis=0)
+        U_bar_std = vars_std_df.mean(axis=0)
+
+        if M > 1:
+            B_std = betas_std_df.sub(beta_bar_std, axis=1).pow(2).sum(axis=0) / (M - 1)
+        else:
+            B_std = 0.0
+
+        total_var_std = U_bar_std + (1.0 + 1.0 / M) * B_std
+        se_std = total_var_std.pow(0.5)
+    else:
+        # Provide empty standardized outputs aligned with unstandardized index
+        beta_bar_std = pd.Series(index=beta_bar.index, dtype="float64")
+        se_std = pd.Series(index=beta_bar.index, dtype="float64")
+
+    r2_mean = float(np.mean(r2_list)) if r2_list else float("nan")
     n_obs_out = int(min(n_list)) if n_list else 0
+
+    # Ensure aligned indices
+    beta_bar_std = beta_bar_std.reindex(beta_bar.index)
+    se_std = se_std.reindex(beta_bar.index)
 
     return PysaResult(
         coef=beta_bar,
         se=se,
+        std_coef=beta_bar_std,
+        std_se=se_std,
         r2=r2_mean,
         n_obs=n_obs_out,
         dep_root=dep_root,
     )
-
-
