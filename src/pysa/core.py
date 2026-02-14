@@ -111,6 +111,7 @@ def pysa_proportion(
         required_cols=None,
     )
 
+
 def pysa_correlation_with_pv(
     data: pd.DataFrame,
     pv_cols: Sequence[str],
