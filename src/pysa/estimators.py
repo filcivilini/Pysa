@@ -204,11 +204,11 @@ def percentiles(pv_cols: Sequence[str], probs: Sequence[float]):
     return _est
 
 
-def cumulative_benchmarks(pv_cols: Sequence[str], cutpoints: Sequence[float] = (400, 475, 550, 625)):
+def cumulative_benchmarks(pv_cols: Sequence[str], cutpoints: Sequence[float]):
+    if cutpoints is None:
+        raise ValueError("cutpoints must be provided (no universal default).")
     """
     Estimator: cumulative benchmark proportions P(PV >= cut) for each cutpoint.
-
-    Returns Series with keys ge_400, ge_475, ...
     """
     pv_candidates = list(pv_cols)
     cuts = list(cutpoints)
@@ -231,7 +231,9 @@ def cumulative_benchmarks(pv_cols: Sequence[str], cutpoints: Sequence[float] = (
     return _est
 
 
-def band_benchmarks(pv_cols: Sequence[str], cutpoints: Sequence[float] = (400, 475, 550, 625)):
+def band_benchmarks(pv_cols: Sequence[str], cutpoints: Sequence[float]):
+    if cutpoints is None:
+        raise ValueError("cutpoints must be provided (no universal default).")
     """
     Estimator: non-cumulative benchmark band proportions.
 
