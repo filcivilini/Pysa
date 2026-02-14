@@ -205,11 +205,11 @@ def percentiles(pv_cols: Sequence[str], probs: Sequence[float]):
 
 
 def cumulative_benchmarks(pv_cols: Sequence[str], cutpoints: Sequence[float]):
-    if cutpoints is None:
-        raise ValueError("cutpoints must be provided (no universal default).")
     """
     Estimator: cumulative benchmark proportions P(PV >= cut) for each cutpoint.
     """
+    if cutpoints is None:
+        raise ValueError("cutpoints must be provided (no universal default).")
     pv_candidates = list(pv_cols)
     cuts = list(cutpoints)
 
