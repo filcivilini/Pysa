@@ -6,7 +6,7 @@ from typing import Callable, Optional, Sequence
 import pandas as pd
 
 from .replication import ReplicationDesign
-from .core import run_with_pvs, pysa_wls
+from .core import run_with_pvs, pysa_wls,  pysa_correlation_with_pv, pysa_percentiles, pysa_cumulative_benchmarks, pysa_band_benchmarks
 from .results import PysaEstimate, PysaResult
 from .estimators import mean_estimator, proportion_estimator
 
@@ -15,6 +15,7 @@ from .estimators import mean_estimator, proportion_estimator
 class SurveySpec:
     pv_cols: Sequence[str]
     replication: ReplicationDesign
+    benchmark_cutpoints: Optional[Sequence[float]] = None
 
     def mean(self, data: pd.DataFrame) -> PysaEstimate:
         est = mean_estimator(self.pv_cols[0])
@@ -23,6 +24,62 @@ class SurveySpec:
     def proportion(self, data: pd.DataFrame, cutoff: float, ge: bool = True) -> PysaEstimate:
         est = proportion_estimator(self.pv_cols[0], cutoff=cutoff, ge=ge)
         return run_with_pvs(data=data, pv_cols=self.pv_cols, replication=self.replication, estimator=est)
+
+    def correlation_with_pv(self, data: pd.DataFrame, other_col: str) -> PysaEstimate:
+    return pysa_correlation_with_pv(
+        data=data,
+        pv_cols=self.pv_cols,
+        replication=self.replication,
+        other_col=other_col,
+    )
+
+
+def percentiles(self, data: pd.DataFrame, probs: Sequence[float]) -> PysaEstimate:
+    return pysa_percentiles(
+        data=data,
+        pv_cols=self.pv_cols,
+        replication=self.replication,
+        probs=probs,
+    )
+
+
+def cumulative_benchmarks(
+    self,
+    data: pd.DataFrame,
+    cutpoints: Optional[Sequence[float]] = None,
+) -> PysaEstimate:
+    cps = cutpoints if cutpoints is not None else self.benchmark_cutpoints
+    if cps is None:
+        raise ValueError(
+            "No benchmark cutpoints provided. Benchmarks are study-specific; "
+            "set SurveySpec.benchmark_cutpoints or pass cutpoints=..."
+        )
+    return pysa_cumulative_benchmarks(
+        data=data,
+        pv_cols=self.pv_cols,
+        replication=self.replication,
+        cutpoints=cps,
+    )
+
+
+def band_benchmarks(
+    self,
+    data: pd.DataFrame,
+    cutpoints: Optional[Sequence[float]] = None,
+) -> PysaEstimate:
+    cps = cutpoints if cutpoints is not None else self.benchmark_cutpoints
+    if cps is None:
+        raise ValueError(
+            "No benchmark cutpoints provided. Benchmarks are study-specific; "
+            "set SurveySpec.benchmark_cutpoints or pass cutpoints=..."
+        )
+    return pysa_band_benchmarks(
+        data=data,
+        pv_cols=self.pv_cols,
+        replication=self.replication,
+        cutpoints=cps,
+    )
+
 
     def wls(
         self,
