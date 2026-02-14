@@ -25,5 +25,10 @@ __all__ = [
     "pysa_percentiles",
     "pysa_cumulative_benchmarks",
     "pysa_band_benchmarks",
+    "Benchmark",
+    "get_benchmark",
+    "get_cutpoints",
+    "list_benchmarks",
 ]
+
 
