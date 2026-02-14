@@ -90,7 +90,7 @@ def pysa_mean(
         data=data,
         pv_cols=pv_cols,
         replication=replication,
-        estimator=mean_estimator(pv_cols[0]),
+        estimator=mean_estimator(pv_cols),
         required_cols=None,
     )
 
@@ -107,10 +107,86 @@ def pysa_proportion(
         data=data,
         pv_cols=pv_cols,
         replication=replication,
-        estimator=proportion_estimator(pv_cols[0], cutoff=cutoff, ge=ge),
+        estimator=proportion_estimator(pv_cols, cutoff=cutoff, ge=ge),
         required_cols=None,
     )
 
+def pysa_correlation_with_pv(
+    data: pd.DataFrame,
+    pv_cols: Sequence[str],
+    replication: ReplicationDesign,
+    other_col: str,
+) -> PysaEstimate:
+    from .estimators import correlation
+    est = correlation(pv_cols=pv_cols, other_col=other_col)
+    return run_with_pvs(
+        data=data,
+        pv_cols=pv_cols,
+        replication=replication,
+        estimator=est,
+        required_cols=[other_col],
+    )
+
+
+def pysa_percentiles(
+    data: pd.DataFrame,
+    pv_cols: Sequence[str],
+    replication: ReplicationDesign,
+    probs: Sequence[float],
+) -> PysaEstimate:
+    from .estimators import percentiles
+    est = percentiles(pv_cols=pv_cols, probs=probs)
+    return run_with_pvs(
+        data=data,
+        pv_cols=pv_cols,
+        replication=replication,
+        estimator=est,
+        required_cols=None,
+    )
+
+
+def pysa_cumulative_benchmarks(
+    data: pd.DataFrame,
+    pv_cols: Sequence[str],
+    replication: ReplicationDesign,
+    cutpoints: Sequence[float],
+) -> PysaEstimate:
+    """
+    Cumulative benchmarks: P(PV >= cutpoint) for each cutpoint.
+
+    NOTE: Do NOT default cutpoints here; benchmarks are study-specific.
+    """
+    from .estimators import cumulative_benchmarks
+    est = cumulative_benchmarks(pv_cols=pv_cols, cutpoints=cutpoints)
+    return run_with_pvs(
+        data=data,
+        pv_cols=pv_cols,
+        replication=replication,
+        estimator=est,
+        required_cols=None,
+    )
+
+
+def pysa_band_benchmarks(
+    data: pd.DataFrame,
+    pv_cols: Sequence[str],
+    replication: ReplicationDesign,
+    cutpoints: Sequence[float],
+) -> PysaEstimate:
+    """
+    Band benchmarks: mutually exclusive bands defined by cutpoints.
+
+    NOTE: Do NOT default cutpoints here; benchmarks are study-specific.
+    """
+    from .estimators import band_benchmarks
+    est = band_benchmarks(pv_cols=pv_cols, cutpoints=cutpoints)
+    return run_with_pvs(
+        data=data,
+        pv_cols=pv_cols,
+        replication=replication,
+        estimator=est,
+        required_cols=None,
+    )
 
 def _build_design_matrix(
     df: pd.DataFrame,
