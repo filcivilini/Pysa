@@ -1,4 +1,29 @@
-from .core import PysaResult, pysa_wls
+from .results import PysaResult, PysaEstimate
+from .core import (
+    pysa_wls,
+    pysa_mean,
+    pysa_proportion,
+    pysa_correlation_with_pv,
+    pysa_percentiles,
+    pysa_cumulative_benchmarks,
+    pysa_band_benchmarks,
+)
+from .benchmarks import (
+    Benchmark,
+    get_benchmark,
+    get_cutpoints,
+    list_benchmarks,
+)
 
-__all__ = ["PysaResult", "pysa_wls"]
-__version__ = "0.1.2"
+__all__ = [
+    "PysaResult",
+    "PysaEstimate",
+    "pysa_wls",
+    "pysa_mean",
+    "pysa_proportion",
+    "pysa_correlation_with_pv",
+    "pysa_percentiles",
+    "pysa_cumulative_benchmarks",
+    "pysa_band_benchmarks",
+]
+
